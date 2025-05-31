@@ -1,6 +1,5 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
-import itertools
 from contextlib import nullcontext
 
 import numpy as np
@@ -19,16 +18,39 @@ from astropy.utils.compat.optional_deps import HAS_PANDAS, HAS_SCIPY
 from astropy.utils.exceptions import AstropyUserWarning
 
 VALID_DTYPES = (">f4", "<f4", ">f8", "<f8")
-VALID_DTYPE_MATRIX = list(itertools.product(VALID_DTYPES, VALID_DTYPES))
-
+VALID_DTYPE_MATRIX = [
+    (dtype1, dtype2) for dtype1 in VALID_DTYPES for dtype2 in VALID_DTYPES
+]
 BOUNDARY_OPTIONS = [None, "fill", "wrap", "extend"]
 NANHANDLING_OPTIONS = ["interpolate", "fill"]
 NORMALIZE_OPTIONS = [True, False]
 PRESERVE_NAN_OPTIONS = [True, False]
 
-BOUNDARIES_AND_CONVOLUTIONS = list(
-    zip(itertools.cycle((convolve,)), BOUNDARY_OPTIONS)
-) + [(convolve_fft, "wrap"), (convolve_fft, "fill")]
+BOUNDARIES_AND_CONVOLUTIONS = [(convolve, option) for option in BOUNDARY_OPTIONS] + [
+    (convolve_fft, "wrap"),
+    (convolve_fft, "fill"),
+]
+
+
+BOUNDARIES_NAN_NORM_OPTS_DTYPE = [
+    (b, nt, nn, pn, dt)
+    for b in BOUNDARY_OPTIONS
+    for nt in NANHANDLING_OPTIONS
+    for nn in NORMALIZE_OPTIONS
+    for pn in PRESERVE_NAN_OPTIONS
+    for dt in VALID_DTYPES
+]
+BOUNDARIES_NAN_NORM_OPTS = [
+    (b, nt, nn, pn)
+    for b in BOUNDARY_OPTIONS
+    for nt in NANHANDLING_OPTIONS
+    for nn in NORMALIZE_OPTIONS
+    for pn in PRESERVE_NAN_OPTIONS
+]
+
+BOUNDARIES_NORM = [(b, nn) for b in BOUNDARY_OPTIONS for nn in NORMALIZE_OPTIONS]
+
+BOUNDARIES_NAN = [(b, nt) for b in BOUNDARY_OPTIONS for nt in NANHANDLING_OPTIONS]
 
 
 class TestConvolve1D:
@@ -58,13 +80,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment", "normalize_kernel", "preserve_nan", "dtype"),
-        itertools.product(
-            BOUNDARY_OPTIONS,
-            NANHANDLING_OPTIONS,
-            NORMALIZE_OPTIONS,
-            PRESERVE_NAN_OPTIONS,
-            VALID_DTYPES,
-        ),
+        BOUNDARIES_NAN_NORM_OPTS_DTYPE,
     )
     def test_quantity(
         self, boundary, nan_treatment, normalize_kernel, preserve_nan, dtype
@@ -88,13 +104,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment", "normalize_kernel", "preserve_nan", "dtype"),
-        itertools.product(
-            BOUNDARY_OPTIONS,
-            NANHANDLING_OPTIONS,
-            NORMALIZE_OPTIONS,
-            PRESERVE_NAN_OPTIONS,
-            VALID_DTYPES,
-        ),
+        BOUNDARIES_NAN_NORM_OPTS_DTYPE,
     )
     def test_input_unmodified(
         self, boundary, nan_treatment, normalize_kernel, preserve_nan, dtype
@@ -126,13 +136,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment", "normalize_kernel", "preserve_nan", "dtype"),
-        itertools.product(
-            BOUNDARY_OPTIONS,
-            NANHANDLING_OPTIONS,
-            NORMALIZE_OPTIONS,
-            PRESERVE_NAN_OPTIONS,
-            VALID_DTYPES,
-        ),
+        BOUNDARIES_NAN_NORM_OPTS_DTYPE,
     )
     def test_input_unmodified_with_nan(
         self, boundary, nan_treatment, normalize_kernel, preserve_nan, dtype
@@ -251,12 +255,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment", "normalize_kernel", "preserve_nan"),
-        itertools.product(
-            BOUNDARY_OPTIONS,
-            NANHANDLING_OPTIONS,
-            NORMALIZE_OPTIONS,
-            PRESERVE_NAN_OPTIONS,
-        ),
+        BOUNDARIES_NAN_NORM_OPTS,
     )
     def test_unity_3_withnan(
         self, boundary, nan_treatment, normalize_kernel, preserve_nan
@@ -305,12 +304,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment", "normalize_kernel", "preserve_nan"),
-        itertools.product(
-            BOUNDARY_OPTIONS,
-            NANHANDLING_OPTIONS,
-            NORMALIZE_OPTIONS,
-            PRESERVE_NAN_OPTIONS,
-        ),
+        BOUNDARIES_NAN_NORM_OPTS,
     )
     def test_uniform_3_withnan(
         self, boundary, nan_treatment, normalize_kernel, preserve_nan
@@ -365,7 +359,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "normalize_kernel"),
-        itertools.product(BOUNDARY_OPTIONS, NORMALIZE_OPTIONS),
+        BOUNDARIES_NORM,
     )
     def test_zero_sum_kernel(self, boundary, normalize_kernel):
         """
@@ -393,7 +387,7 @@ class TestConvolve1D:
 
     @pytest.mark.parametrize(
         ("boundary", "normalize_kernel"),
-        itertools.product(BOUNDARY_OPTIONS, NORMALIZE_OPTIONS),
+        BOUNDARIES_NORM,
     )
     def test_int_masked_kernel(self, boundary, normalize_kernel):
         """
@@ -940,7 +934,7 @@ class TestConvolve3D:
 
     @pytest.mark.parametrize(
         ("boundary", "nan_treatment"),
-        itertools.product(BOUNDARY_OPTIONS, NANHANDLING_OPTIONS),
+        BOUNDARIES_NAN,
     )
     def test_unity_3x3x3_withnan(self, boundary, nan_treatment):
         """
@@ -1243,7 +1237,7 @@ def test_non_square_kernel_asymmetric(boundary):
 
 @pytest.mark.parametrize(
     ("boundary", "normalize_kernel"),
-    itertools.product(BOUNDARY_OPTIONS, NORMALIZE_OPTIONS),
+    BOUNDARIES_NORM,
 )
 def test_uninterpolated_nan_regions(boundary, normalize_kernel):
     # Issue #8086
