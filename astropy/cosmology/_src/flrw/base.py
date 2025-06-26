@@ -1,5 +1,4 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
-# ruff: noqa: RUF009
 
 from __future__ import annotations
 
@@ -8,12 +7,13 @@ __all__ = ["FLRW", "FlatFLRWMixin"]
 import inspect
 import warnings
 from abc import abstractmethod
+from collections.abc import Mapping
 from dataclasses import field
 from functools import cached_property
 from inspect import signature
 from math import exp, floor, log, pi, sqrt
 from numbers import Number
-from typing import TYPE_CHECKING, TypeVar, overload
+from typing import TYPE_CHECKING, Self, TypeVar, overload
 
 import numpy as np
 from numpy import inf, sin
@@ -36,10 +36,12 @@ from astropy.cosmology._src.parameter import (
     validate_with_unit,
 )
 from astropy.cosmology._src.traits import (
+    HubbleParameter,
     ScaleFactor,
     TemperatureCMB,
     _BaryonComponent,
     _CriticalDensity,
+    _MatterComponent,
 )
 from astropy.cosmology._src.utils import (
     aszarr,
@@ -48,9 +50,6 @@ from astropy.cosmology._src.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-    from typing import Self
-
     import astropy.units
 
 
@@ -72,8 +71,7 @@ _InputT = TypeVar("_InputT", bound=u.Quantity | np.ndarray | np.generic | Number
 
 # Some conversion constants -- useful to compute them once here and reuse in
 # the initialization rather than have every object do them.
-_H0units_to_invs = (u.km / (u.s * u.Mpc)).to(1.0 / u.s)
-_sec_to_Gyr = u.s.to(u.Gyr)
+
 # angle conversions
 _radian_in_arcsec = (1 * u.rad).to(u.arcsec)
 _radian_in_arcmin = (1 * u.rad).to(u.arcmin)
@@ -97,7 +95,15 @@ ParameterOde0 = Parameter(
 
 
 @dataclass_decorator
-class FLRW(Cosmology, ScaleFactor, TemperatureCMB, _CriticalDensity, _BaryonComponent):
+class FLRW(
+    Cosmology,
+    HubbleParameter,
+    ScaleFactor,
+    TemperatureCMB,
+    _CriticalDensity,
+    _BaryonComponent,
+    _MatterComponent,
+):
     """An isotropic and homogeneous (Friedmann-Lemaitre-Robertson-Walker) cosmology.
 
     This is an abstract base class -- you cannot instantiate examples of this
@@ -329,21 +335,6 @@ class FLRW(Cosmology, ScaleFactor, TemperatureCMB, _CriticalDensity, _BaryonComp
         return self._massivenu
 
     @cached_property
-    def h(self) -> float:
-        """Dimensionless Hubble constant: h = H_0 / 100 [km/sec/Mpc]."""
-        return self.H0.value / 100.0
-
-    @cached_property
-    def hubble_time(self) -> u.Quantity:
-        """Hubble time."""
-        return (_sec_to_Gyr / (self.H0.value * _H0units_to_invs)) << u.Gyr
-
-    @cached_property
-    def hubble_distance(self) -> u.Quantity:
-        """Hubble distance."""
-        return (const.c / self.H0).to(u.Mpc)
-
-    @cached_property
     def critical_density0(self) -> u.Quantity:
         r"""Critical mass density at z=0.
 
@@ -421,33 +412,6 @@ class FLRW(Cosmology, ScaleFactor, TemperatureCMB, _CriticalDensity, _BaryonComp
             Returns float if input scalar.
         """
         return self.Om(z) + self.Ogamma(z) + self.Onu(z) + self.Ode(z) + self.Ok(z)
-
-    @deprecated_keywords("z", since="7.0")
-    def Om(self, z):
-        """Return the density parameter for non-relativistic matter at redshift ``z``.
-
-        Parameters
-        ----------
-        z : Quantity-like ['redshift'], array-like
-            Input redshift.
-
-            .. versionchanged:: 7.0
-                Passing z as a keyword argument is deprecated.
-
-        Returns
-        -------
-        Om : ndarray or float
-            The density of non-relativistic matter relative to the critical
-            density at each redshift.
-            Returns `float` if the input is scalar.
-
-        Notes
-        -----
-        This does not include neutrinos, even if non-relativistic at the
-        redshift of interest; see `Onu`.
-        """
-        z = aszarr(z)
-        return self.Om0 * (z + 1.0) ** 3 * self.inv_efunc(z) ** 2
 
     @deprecated_keywords("z", since="7.0")
     def Odm(self, z):
@@ -897,25 +861,6 @@ class FLRW(Cosmology, ScaleFactor, TemperatureCMB, _CriticalDensity, _BaryonComp
         """
         z = aszarr(z)
         return (z + 1.0) ** 2 * self.inv_efunc(z)
-
-    @deprecated_keywords("z", since="7.0")
-    def H(self, z):
-        """Hubble parameter (km/s/Mpc) at redshift ``z``.
-
-        Parameters
-        ----------
-        z : Quantity-like ['redshift'], array-like
-            Input redshift.
-
-            .. versionchanged:: 7.0
-                Passing z as a keyword argument is deprecated.
-
-        Returns
-        -------
-        H : Quantity ['frequency']
-            Hubble parameter at each input redshift.
-        """
-        return self.H0 * self.efunc(z)
 
     @deprecated_keywords("z", since="7.0")
     def lookback_time(self, z):

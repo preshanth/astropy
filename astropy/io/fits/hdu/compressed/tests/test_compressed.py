@@ -7,7 +7,6 @@ import pickle
 import re
 import time
 from io import BytesIO
-from itertools import product
 
 import numpy as np
 import pytest
@@ -496,14 +495,6 @@ class TestCompressedImage(FitsTestCase):
         Ensure that setting reserved keywords related to the table data
         structure on CompImageHDU image headers fails.
         """
-
-        def test_set_keyword(hdr, keyword, value):
-            with pytest.warns(UserWarning) as w:
-                hdr[keyword] = value
-            assert len(w) == 1
-            assert str(w[0].message).startswith(f"Keyword {keyword!r} is reserved")
-            assert keyword not in hdr
-
         with fits.open(self.data("comp.fits")) as hdul:
             hdr = hdul[1].header
             hdr["TFIELDS"] = 8
@@ -864,9 +855,8 @@ class TestCompressedImage(FitsTestCase):
         new = fits.getdata(testfile)
         np.testing.assert_array_equal(data, new)
 
-    @pytest.mark.parametrize(
-        ("dtype", "compression_type"), product(("f", "i4"), COMPRESSION_TYPES)
-    )
+    @pytest.mark.parametrize("dtype", ["f", "i4"])
+    @pytest.mark.parametrize("compression_type", COMPRESSION_TYPES)
     def test_write_non_contiguous_data(self, dtype, compression_type):
         """
         Regression test for https://github.com/astropy/astropy/issues/2150

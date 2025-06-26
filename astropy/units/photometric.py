@@ -10,8 +10,6 @@ Both the units and magnitudes are available in (and should be used
 through) the `astropy.units` namespace.
 
 """
-# avoid ruff complaints about undefined names defined by def_unit
-# ruff: noqa: F821
 
 import numpy as np
 
@@ -19,7 +17,7 @@ from astropy.constants.si import L_bol0
 
 from . import astrophys, cgs, si
 from .core import UnitBase, def_unit
-from .utils import generate_unit_summary
+from .docgen import generate_unit_summary
 
 __all__ = []  #  Units are added at the end
 
