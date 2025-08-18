@@ -186,6 +186,23 @@ def _skycoord_constructor(loader, node):
     return coords.SkyCoord.info._construct_from_dict(map)
 
 
+def _frame_representer(dumper, obj):
+    map = obj.info._represent_as_dict()
+    # Create tag based on the frame class name and module
+    tag = f"!astropy.coordinates.{obj.__class__.__name__}"
+    return dumper.represent_mapping(tag, map)
+
+
+def _frame_constructor(loader, node):
+    map = loader.construct_mapping(node)
+    # Extract frame class name from the tag
+    tag = node.tag
+    frame_name = tag.split('.')[-1]  # Get class name from tag
+    
+    frame_cls = getattr(coords, frame_name)
+    return frame_cls.info._construct_from_dict(map)
+
+
 # Straight from yaml's Representer
 def _complex_representer(self, data):
     if data.imag == 0.0:
@@ -272,6 +289,7 @@ AstropyDumper.add_representer(np.void, _void_representer)
 AstropyDumper.add_representer(Time, _time_representer)
 AstropyDumper.add_representer(TimeDelta, _timedelta_representer)
 AstropyDumper.add_representer(coords.SkyCoord, _skycoord_representer)
+AstropyDumper.add_multi_representer(coords.BaseCoordinateFrame, _frame_representer)
 AstropyDumper.add_representer(SerializedColumn, _serialized_column_representer)
 
 # Numpy dtypes
@@ -315,6 +333,7 @@ AstropyLoader.add_constructor(
     "!astropy.table.SerializedColumn", _serialized_column_constructor
 )
 
+
 for cls, tag in (
     (u.Quantity, "!astropy.units.Quantity"),
     (u.Magnitude, "!astropy.units.Magnitude"),
@@ -327,6 +346,20 @@ for cls, tag in (
 ):
     AstropyDumper.add_multi_representer(cls, _quantity_representer(tag))
     AstropyLoader.add_constructor(tag, _quantity_constructor(cls))
+
+# Register constructors for coordinate frame classes
+for cls, tag in (
+    (coords.ICRS, "!astropy.coordinates.ICRS"),
+    (coords.FK4, "!astropy.coordinates.FK4"),
+    (coords.FK5, "!astropy.coordinates.FK5"),
+    (coords.Galactic, "!astropy.coordinates.Galactic"),
+    (coords.Galactocentric, "!astropy.coordinates.Galactocentric"),
+    (coords.GCRS, "!astropy.coordinates.GCRS"),
+    (coords.CIRS, "!astropy.coordinates.CIRS"),
+    (coords.ITRS, "!astropy.coordinates.ITRS"),
+    (coords.AltAz, "!astropy.coordinates.AltAz"),
+):
+    AstropyLoader.add_constructor(tag, _frame_constructor)
 
 for cls in list(coords.representation.REPRESENTATION_CLASSES.values()) + list(
     coords.representation.DIFFERENTIAL_CLASSES.values()
